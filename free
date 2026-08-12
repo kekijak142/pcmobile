@@ -33,9 +33,9 @@ local V3         = Vector3.new
 local V3zero     = Vector3.zero
 
 --------------------------------------------------------------------------------
--- LOAD WIND UI (BLUE SKY THEME)
+-- LOAD WIND UI (BLUE SKY THEME) - FIXED GITHUB RAW LINK
 --------------------------------------------------------------------------------
-local WindUI = loadstring(game:HttpGet("https://tree-hub.vercel.app/api/UI/WindUI"))()
+local WindUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/Footagesus/WindUI/refs/heads/main/maclib.lua"))()
 
 local Window = WindUI:CreateWindow({
     Title = "Ascend Premium",
