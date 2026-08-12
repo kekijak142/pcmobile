@@ -1,8 +1,10 @@
 local Players = game:GetService("Players")
 local lp = Players.LocalPlayer
 local RunService = game:GetService("RunService")
+local CoreGui = game:GetService("CoreGui")
+local uis = game:GetService("UserInputService")
 
--- 2. AntiCheat Bypass
+-- 1. AntiCheat Bypass
 task.spawn(function()
     local p = workspace:FindFirstChild("FE") and workspace.FE:FindFirstChild("Actions")
     if p then
@@ -22,6 +24,306 @@ task.spawn(function()
 end)
 
 --------------------------------------------------------------------------------
+-- ZERO-DEPENDENCY CUSTOM UI LIBRARY
+--------------------------------------------------------------------------------
+for _, v in pairs(CoreGui:GetChildren()) do
+    if v.Name == "AscendCustomUI" then v:Destroy() end
+end
+
+local function CreateUI()
+    local sg = Instance.new("ScreenGui")
+    sg.Name = "AscendCustomUI"
+    sg.Parent = CoreGui
+    sg.ResetOnSpawn = false
+
+    local main = Instance.new("Frame", sg)
+    main.Size = UDim2.new(0, 580, 0, 420)
+    main.Position = UDim2.new(0.5, -290, 0.5, -210)
+    main.BackgroundColor3 = Color3.fromRGB(15, 20, 30)
+    main.BorderSizePixel = 0
+    main.ClipsDescendants = true
+    Instance.new("UICorner", main).CornerRadius = UDim.new(0, 10)
+
+    -- Dragging Logic
+    local dragging, dragInput, dragStart, startPos
+    main.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true; dragStart = input.Position; startPos = main.Position
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then dragging = false end
+            end)
+        end
+    end)
+    main.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement then dragInput = input end
+    end)
+    uis.InputChanged:Connect(function(input)
+        if input == dragInput and dragging then
+            local delta = input.Position - dragStart
+            main.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        end
+    end)
+
+    -- Toggle UI Visibility
+    uis.InputBegan:Connect(function(input, gp)
+        if not gp and input.KeyCode == Enum.KeyCode.RightShift then
+            sg.Enabled = not sg.Enabled
+        end
+    end)
+
+    local topbar = Instance.new("Frame", main)
+    topbar.Size = UDim2.new(1, 0, 0, 40)
+    topbar.BackgroundColor3 = Color3.fromRGB(20, 25, 35)
+    topbar.BorderSizePixel = 0
+    local titleLbl = Instance.new("TextLabel", topbar)
+    titleLbl.Size = UDim2.new(1, -20, 1, 0)
+    titleLbl.Position = UDim2.new(0, 20, 0, 0)
+    titleLbl.BackgroundTransparency = 1
+    titleLbl.Text = "Ascend Premium"
+    titleLbl.TextColor3 = Color3.fromRGB(135, 206, 235)
+    titleLbl.Font = Enum.Font.GothamBold
+    titleLbl.TextSize = 18
+    titleLbl.TextXAlignment = Enum.TextXAlignment.Left
+
+    local sidebar = Instance.new("Frame", main)
+    sidebar.Size = UDim2.new(0, 140, 1, -40)
+    sidebar.Position = UDim2.new(0, 0, 0, 40)
+    sidebar.BackgroundColor3 = Color3.fromRGB(18, 22, 32)
+    sidebar.BorderSizePixel = 0
+    local sideList = Instance.new("UIListLayout", sidebar)
+    sideList.Padding = UDim.new(0, 5)
+    sideList.HorizontalAlignment = Enum.HorizontalAlignment.Center
+    local sidePad = Instance.new("UIPadding", sidebar)
+    sidePad.PaddingTop = UDim.new(0, 10)
+
+    local contentArea = Instance.new("Frame", main)
+    contentArea.Size = UDim2.new(1, -140, 1, -40)
+    contentArea.Position = UDim2.new(0, 140, 0, 40)
+    contentArea.BackgroundTransparency = 1
+
+    local window = {Tabs = {}}
+
+    function window:CreateTab(name)
+        local tabBtn = Instance.new("TextButton", sidebar)
+        tabBtn.Size = UDim2.new(0.9, 0, 0, 32)
+        tabBtn.BackgroundColor3 = Color3.fromRGB(25, 30, 40)
+        tabBtn.Text = name
+        tabBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
+        tabBtn.Font = Enum.Font.Gotham
+        tabBtn.TextSize = 14
+        Instance.new("UICorner", tabBtn).CornerRadius = UDim.new(0, 6)
+
+        local tabContent = Instance.new("ScrollingFrame", contentArea)
+        tabContent.Size = UDim2.new(1, 0, 1, 0)
+        tabContent.BackgroundTransparency = 1
+        tabContent.ScrollBarThickness = 2
+        tabContent.Visible = false
+        local listLayout = Instance.new("UIListLayout", tabContent)
+        listLayout.Padding = UDim.new(0, 8)
+        listLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+        local tabPad = Instance.new("UIPadding", tabContent)
+        tabPad.PaddingTop = UDim.new(0, 10)
+        tabPad.PaddingBottom = UDim.new(0, 10)
+
+        tabBtn.MouseButton1Click:Connect(function()
+            for _, t in pairs(window.Tabs) do
+                t.Content.Visible = false
+                t.Btn.BackgroundColor3 = Color3.fromRGB(25, 30, 40)
+                t.Btn.TextColor3 = Color3.fromRGB(200, 200, 200)
+            end
+            tabContent.Visible = true
+            tabBtn.BackgroundColor3 = Color3.fromRGB(135, 206, 235)
+            tabBtn.TextColor3 = Color3.fromRGB(15, 20, 30)
+        end)
+
+        table.insert(window.Tabs, {Btn = tabBtn, Content = tabContent})
+        if #window.Tabs == 1 then
+            tabContent.Visible = true
+            tabBtn.BackgroundColor3 = Color3.fromRGB(135, 206, 235)
+            tabBtn.TextColor3 = Color3.fromRGB(15, 20, 30)
+        end
+
+        local elements = {}
+
+        function elements:CreateImage(imgId)
+            local img = Instance.new("ImageLabel", tabContent)
+            img.Size = UDim2.new(0.95, 0, 0, 150)
+            img.Image = imgId
+            img.ScaleType = Enum.ScaleType.Crop
+            img.BackgroundColor3 = Color3.fromRGB(25, 30, 40)
+            Instance.new("UICorner", img).CornerRadius = UDim.new(0, 8)
+        end
+
+        function elements:CreateSection(text)
+            local lbl = Instance.new("TextLabel", tabContent)
+            lbl.Size = UDim2.new(0.95, 0, 0, 25)
+            lbl.BackgroundTransparency = 1
+            lbl.Text = text
+            lbl.TextColor3 = Color3.fromRGB(135, 206, 235)
+            lbl.Font = Enum.Font.GothamBold
+            lbl.TextSize = 14
+            lbl.TextXAlignment = Enum.TextXAlignment.Left
+        end
+
+        function elements:CreateButton(text, callback)
+            local btn = Instance.new("TextButton", tabContent)
+            btn.Size = UDim2.new(0.95, 0, 0, 35)
+            btn.BackgroundColor3 = Color3.fromRGB(30, 35, 45)
+            btn.Text = text
+            btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+            btn.Font = Enum.Font.Gotham
+            btn.TextSize = 14
+            Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+            btn.MouseButton1Click:Connect(callback)
+        end
+
+        function elements:CreateToggle(text, default, callback)
+            local frame = Instance.new("Frame", tabContent)
+            frame.Size = UDim2.new(0.95, 0, 0, 35)
+            frame.BackgroundColor3 = Color3.fromRGB(30, 35, 45)
+            Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 6)
+
+            local lbl = Instance.new("TextLabel", frame)
+            lbl.Size = UDim2.new(1, -50, 1, 0)
+            lbl.Position = UDim2.new(0, 10, 0, 0)
+            lbl.BackgroundTransparency = 1
+            lbl.Text = text
+            lbl.TextColor3 = Color3.fromRGB(255, 255, 255)
+            lbl.Font = Enum.Font.Gotham
+            lbl.TextSize = 14
+            lbl.TextXAlignment = Enum.TextXAlignment.Left
+
+            local btn = Instance.new("TextButton", frame)
+            btn.Size = UDim2.new(0, 36, 0, 18)
+            btn.Position = UDim2.new(1, -46, 0.5, -9)
+            btn.BackgroundColor3 = default and Color3.fromRGB(135, 206, 235) or Color3.fromRGB(15, 20, 30)
+            btn.Text = ""
+            Instance.new("UICorner", btn).CornerRadius = UDim.new(1, 0)
+            
+            local state = default
+            btn.MouseButton1Click:Connect(function()
+                state = not state
+                btn.BackgroundColor3 = state and Color3.fromRGB(135, 206, 235) or Color3.fromRGB(15, 20, 30)
+                callback(state)
+            end)
+        end
+
+        function elements:CreateSlider(text, min, max, default, callback)
+            local frame = Instance.new("Frame", tabContent)
+            frame.Size = UDim2.new(0.95, 0, 0, 45)
+            frame.BackgroundColor3 = Color3.fromRGB(30, 35, 45)
+            Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 6)
+
+            local lbl = Instance.new("TextLabel", frame)
+            lbl.Size = UDim2.new(1, -20, 0, 20)
+            lbl.Position = UDim2.new(0, 10, 0, 5)
+            lbl.BackgroundTransparency = 1
+            lbl.Text = text .. ": " .. tostring(default)
+            lbl.TextColor3 = Color3.fromRGB(255, 255, 255)
+            lbl.Font = Enum.Font.Gotham
+            lbl.TextSize = 14
+            lbl.TextXAlignment = Enum.TextXAlignment.Left
+
+            local sbg = Instance.new("TextButton", frame)
+            sbg.Size = UDim2.new(1, -20, 0, 6)
+            sbg.Position = UDim2.new(0, 10, 0, 30)
+            sbg.BackgroundColor3 = Color3.fromRGB(15, 20, 30)
+            sbg.Text = ""
+            Instance.new("UICorner", sbg).CornerRadius = UDim.new(1, 0)
+
+            local fill = Instance.new("Frame", sbg)
+            fill.Size = UDim2.new((default - min) / (max - min), 0, 1, 0)
+            fill.BackgroundColor3 = Color3.fromRGB(135, 206, 235)
+            Instance.new("UICorner", fill).CornerRadius = UDim.new(1, 0)
+
+            local dragging = false
+            local function move(input)
+                local pos = math.clamp((input.Position.X - sbg.AbsolutePosition.X) / sbg.AbsoluteSize.X, 0, 1)
+                fill.Size = UDim2.new(pos, 0, 1, 0)
+                local val = math.floor(min + ((max - min) * pos))
+                lbl.Text = text .. ": " .. tostring(val)
+                callback(val)
+            end
+            sbg.InputBegan:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = true; move(input) end end)
+            sbg.InputEnded:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end end)
+            uis.InputChanged:Connect(function(input) if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then move(input) end end)
+        end
+
+        function elements:CreateInput(text, callback)
+            local frame = Instance.new("Frame", tabContent)
+            frame.Size = UDim2.new(0.95, 0, 0, 35)
+            frame.BackgroundColor3 = Color3.fromRGB(30, 35, 45)
+            Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 6)
+            
+            local box = Instance.new("TextBox", frame)
+            box.Size = UDim2.new(1, -20, 1, 0)
+            box.Position = UDim2.new(0, 10, 0, 0)
+            box.BackgroundTransparency = 1
+            box.Text = ""
+            box.PlaceholderText = text
+            box.TextColor3 = Color3.fromRGB(255, 255, 255)
+            box.PlaceholderColor3 = Color3.fromRGB(150, 150, 150)
+            box.Font = Enum.Font.Gotham
+            box.TextSize = 14
+            box.TextXAlignment = Enum.TextXAlignment.Left
+            box.FocusLost:Connect(function() callback(box.Text) end)
+        end
+
+        function elements:CreateCycle(text, options, default, callback)
+            local frame = Instance.new("Frame", tabContent)
+            frame.Size = UDim2.new(0.95, 0, 0, 35)
+            frame.BackgroundColor3 = Color3.fromRGB(30, 35, 45)
+            Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 6)
+
+            local lbl = Instance.new("TextLabel", frame)
+            lbl.Size = UDim2.new(0.5, 0, 1, 0)
+            lbl.Position = UDim2.new(0, 10, 0, 0)
+            lbl.BackgroundTransparency = 1
+            lbl.Text = text
+            lbl.TextColor3 = Color3.fromRGB(255, 255, 255)
+            lbl.Font = Enum.Font.Gotham
+            lbl.TextSize = 14
+            lbl.TextXAlignment = Enum.TextXAlignment.Left
+
+            local btn = Instance.new("TextButton", frame)
+            btn.Size = UDim2.new(0.4, 0, 0, 25)
+            btn.Position = UDim2.new(0.6, -10, 0.5, -12.5)
+            btn.BackgroundColor3 = Color3.fromRGB(15, 20, 30)
+            btn.Text = default
+            btn.TextColor3 = Color3.fromRGB(135, 206, 235)
+            btn.Font = Enum.Font.GothamBold
+            btn.TextSize = 12
+            Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
+
+            local index = 1
+            for i, v in ipairs(options) do if v == default then index = i break end end
+
+            btn.MouseButton1Click:Connect(function()
+                index = index + 1
+                if index > #options then index = 1 end
+                btn.Text = options[index]
+                callback(options[index])
+            end)
+        end
+
+        return elements
+    end
+
+    -- Fix scroll size
+    RunService.RenderStepped:Connect(function()
+        for _, t in pairs(window.Tabs) do
+            local content = t.Content
+            local list = content:FindFirstChildOfClass("UIListLayout")
+            if list then
+                content.CanvasSize = UDim2.new(0, 0, 0, list.AbsoluteContentSize.Y + 20)
+            end
+        end
+    end)
+
+    return window
+end
+
+--------------------------------------------------------------------------------
 -- GLOBAL LOGIC VARIABLES
 --------------------------------------------------------------------------------
 local fti        = firetouchinterest
@@ -33,75 +335,54 @@ local V3         = Vector3.new
 local V3zero     = Vector3.zero
 
 --------------------------------------------------------------------------------
--- LOAD WIND UI (BLUE SKY THEME) - FIXED GITHUB RAW LINK
+-- INITIALIZE UI
 --------------------------------------------------------------------------------
-local WindUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/Footagesus/WindUI/refs/heads/main/maclib.lua"))()
-
-local Window = WindUI:CreateWindow({
-    Title = "Ascend Premium",
-    Icon = "lucide-cloud", -- Cute cloud icon for the sky theme!
-    Author = ".kimidev & .savv",
-    Folder = "AscendPremium",
-    Size = UDim2.fromOffset(580, 460),
-    Transparent = true,
-    Theme = "Dark",
-    Accent = Color3.fromRGB(135, 206, 235) -- Beautiful Blue Sky Accent
-})
-
---------------------------------------------------------------------------------
--- TABS SETUP
---------------------------------------------------------------------------------
-local TabHome = Window:Tab({ Title = "Home", Icon = "lucide-home" })
-local TabReach = Window:Tab({ Title = "Reach", Icon = "lucide-move" })
-local TabXeno = Window:Tab({ Title = "Xeno & Solara", Icon = "lucide-zap" })
-local TabReact = Window:Tab({ Title = "React", Icon = "lucide-clock" })
-local TabMoss = Window:Tab({ Title = "Xeno Moss", Icon = "lucide-crosshair" })
+local Window = CreateUI()
+local TabHome = Window:CreateTab("Home")
+local TabReach = Window:CreateTab("Reach")
+local TabXeno = Window:CreateTab("Xeno & Solara")
+local TabReact = Window:CreateTab("React")
+local TabMoss = Window:CreateTab("Xeno Moss")
 
 --------------------------------------------------------------------------------
 -- TAB 1: HOME
 --------------------------------------------------------------------------------
-TabHome:Paragraph({ 
-    Title = "Join our Discord", 
-    Desc = "Link: https://discord.gg/grtaeN2qG\nCredits: @kimidev, @savv\nPress RightShift to Hide UI" 
-})
+-- ANIME BANNER! You can change this ID if you want a different picture.
+TabHome:CreateImage("rbxassetid://13476313331") 
+
+TabHome:CreateSection("Join our Discord")
+TabHome:CreateSection("Link: https://discord.gg/grtaeN2qG")
+TabHome:CreateSection("Credits: @kimidev, @savv")
+TabHome:CreateSection("Press RightShift to Hide UI")
 
 --------------------------------------------------------------------------------
 -- TAB 2: REACH
 --------------------------------------------------------------------------------
-TabReach:Section({ Title = "Reach [Method 1]" })
+TabReach:CreateSection("Reach [Method 1]")
 
 local e_reach1, d_reach1, c_reach1 = false, 1, nil
+TabReach:CreateToggle("Enable Reach [M1]", false, function(v)
+    e_reach1 = v
+    if not v and c_reach1 then c_reach1:Disconnect(); c_reach1 = nil; return end
+    if c_reach1 then c_reach1:Disconnect() end
+    c_reach1 = RunService.RenderStepped:Connect(function()
+        local p = game.Players.LocalPlayer; local ch = p and p.Character; local hrp = ch and ch:FindFirstChild("HumanoidRootPart")
+        local h = ch and ch:FindFirstChild("Humanoid")
+        if not (ch and hrp and h) then return end
+        local t = workspace:FindFirstChild("TPSSystem"); t = t and t:FindFirstChild("TPS"); if not t then return end
+        if (hrp.Position - t.Position).Magnitude > d_reach1 then return end
+        local pf = game.Lighting:FindFirstChild(p.Name); pf = pf and pf:FindFirstChild("PreferredFoot"); if not pf then return end
+        local ln = (h.RigType == Enum.HumanoidRigType.R6) and ((pf.Value == 1) and "Right Leg" or "Left Leg") or ((pf.Value == 1) and "RightLowerLeg" or "LeftLowerLeg")
+        local l = ch:FindFirstChild(ln)
+        if l then fti(l, t, 0); fti(l, t, 1) end
+    end)
+end)
 
-TabReach:Toggle({ 
-    Title = "Enable Reach [M1]", 
-    Default = false, 
-    Callback = function(v)
-        e_reach1 = v
-        if not v and c_reach1 then c_reach1:Disconnect(); c_reach1 = nil; return end
-        if c_reach1 then c_reach1:Disconnect() end
-        c_reach1 = RunService.RenderStepped:Connect(function()
-            local p = game.Players.LocalPlayer; local ch = p and p.Character; local hrp = ch and ch:FindFirstChild("HumanoidRootPart")
-            local h = ch and ch:FindFirstChild("Humanoid")
-            if not (ch and hrp and h) then return end
-            local t = workspace:FindFirstChild("TPSSystem"); t = t and t:FindFirstChild("TPS"); if not t then return end
-            if (hrp.Position - t.Position).Magnitude > d_reach1 then return end
-            local pf = game.Lighting:FindFirstChild(p.Name); pf = pf and pf:FindFirstChild("PreferredFoot"); if not pf then return end
-            local ln = (h.RigType == Enum.HumanoidRigType.R6) and ((pf.Value == 1) and "Right Leg" or "Left Leg") or ((pf.Value == 1) and "RightLowerLeg" or "LeftLowerLeg")
-            local l = ch:FindFirstChild(ln)
-            if l then fti(l, t, 0); fti(l, t, 1) end
-        end)
-    end 
-})
+TabReach:CreateInput("Reach Size (Type & Enter)", function(v) 
+    d_reach1 = tonumber(v) or d_reach1 
+end)
 
-TabReach:Input({ 
-    Title = "Reach Size", 
-    Placeholder = "Enter Size (Default 1)", 
-    Callback = function(v) 
-        d_reach1 = tonumber(v) or d_reach1 
-    end 
-})
-
-TabReach:Section({ Title = "Reach [Method 2]" })
+TabReach:CreateSection("Reach [Method 2]")
 
 local reachSize, legReachEnabled, reachConn = Vector3.new(5,5,5), false, nil
 local shapeType, transparency2 = "Box", 0.7
@@ -183,78 +464,50 @@ local function startReach2()
 end
 local function stopReach2() if reachConn then reachConn:Disconnect(); reachConn=nil end; reachPart.CFrame = CFrame.new(0,-9999,0) end
 
-TabReach:Dropdown({ 
-    Title = "Select Shape", 
-    Values = {"Box","Sphere","Cylinder"}, 
-    Value = "Box", 
-    Callback = function(v)
-        shapeType = v
-        if shapeType=="Box" then reachPart.Shape=Enum.PartType.Block elseif shapeType=="Sphere" then reachPart.Shape=Enum.PartType.Ball elseif shapeType=="Cylinder" then reachPart.Shape=Enum.PartType.Cylinder end
-        if legReachEnabled then startReach2() end
-    end 
-})
+-- Custom Cycle button for shapes
+TabReach:CreateCycle("Select Shape", {"Box","Sphere","Cylinder"}, "Box", function(v)
+    shapeType = v
+    if shapeType=="Box" then reachPart.Shape=Enum.PartType.Block elseif shapeType=="Sphere" then reachPart.Shape=Enum.PartType.Ball elseif shapeType=="Cylinder" then reachPart.Shape=Enum.PartType.Cylinder end
+    if legReachEnabled then startReach2() end
+end)
 
-TabReach:Toggle({ 
-    Title = "Enable Reach [M2]", 
-    Default = false, 
-    Callback = function(v) 
-        legReachEnabled = v; 
-        if v then startReach2() else stopReach2() end 
-    end 
-})
+TabReach:CreateToggle("Enable Reach [M2]", false, function(v) 
+    legReachEnabled = v; 
+    if v then startReach2() else stopReach2() end 
+end)
 
-TabReach:Slider({ 
-    Title = "Reach X", 
-    Min = 1, Max = 50, Default = 5, 
-    Callback = function(v) 
-        reachSize=Vector3.new(v,reachSize.Y,reachSize.Z); reachPart.Size=reachSize; 
+TabReach:CreateSlider("Reach X", 1, 50, 5, function(v) 
+    reachSize=Vector3.new(v,reachSize.Y,reachSize.Z); reachPart.Size=reachSize; 
+    if legReachEnabled then startReach2() end 
+end)
+
+TabReach:CreateSlider("Reach Y", 1, 50, 5, function(v) 
+    reachSize=Vector3.new(reachSize.X,v,reachSize.Z); reachPart.Size=reachSize; 
+    if legReachEnabled then startReach2() end 
+end)
+
+TabReach:CreateSlider("Reach Z", 1, 50, 5, function(v) 
+    reachSize=Vector3.new(reachSize.X,reachSize.Y,v); reachPart.Size=reachSize; 
+    if legReachEnabled then startReach2() end 
+end)
+
+TabReach:CreateInput("Sync Reach XYZ", function(v) 
+    local n=tonumber(v); 
+    if n then 
+        reachSize=Vector3.new(n,n,n); reachPart.Size=reachSize; 
         if legReachEnabled then startReach2() end 
     end 
-})
+end)
 
-TabReach:Slider({ 
-    Title = "Reach Y", 
-    Min = 1, Max = 50, Default = 5, 
-    Callback = function(v) 
-        reachSize=Vector3.new(reachSize.X,v,reachSize.Z); reachPart.Size=reachSize; 
-        if legReachEnabled then startReach2() end 
-    end 
-})
-
-TabReach:Slider({ 
-    Title = "Reach Z", 
-    Min = 1, Max = 50, Default = 5, 
-    Callback = function(v) 
-        reachSize=Vector3.new(reachSize.X,reachSize.Y,v); reachPart.Size=reachSize; 
-        if legReachEnabled then startReach2() end 
-    end 
-})
-
-TabReach:Input({ 
-    Title = "Sync Reach XYZ", 
-    Placeholder = "Enter value",
-    Callback = function(v) 
-        local n=tonumber(v); 
-        if n then 
-            reachSize=Vector3.new(n,n,n); reachPart.Size=reachSize; 
-            if legReachEnabled then startReach2() end 
-        end 
-    end 
-})
-
-TabReach:Toggle({ 
-    Title = "Hide Box", 
-    Default = false, 
-    Callback = function(v) 
-        transparency2 = v and 1 or 0.7; 
-        reachPart.Transparency = transparency2 
-    end 
-})
+TabReach:CreateToggle("Hide Box", false, function(v) 
+    transparency2 = v and 1 or 0.7; 
+    reachPart.Transparency = transparency2 
+end)
 
 --------------------------------------------------------------------------------
 -- TAB 3: XENO & SOLARA REACH
 --------------------------------------------------------------------------------
-TabXeno:Section({ Title = "Best Reach Method Provided" })
+TabXeno:CreateSection("Best Reach Method Provided")
 
 local reachEnabled3, shouldReEnable3, reachDistance3, currentConnection3, storedHip3 = false, false, 16, nil, nil
 local function enableReach3()
@@ -287,49 +540,38 @@ lp.CharacterAdded:Connect(function()
     if shouldReEnable3 then task.wait(0.25); enableReach3() end
 end)
 
-TabXeno:Toggle({ 
-    Title = "Enable / Disable Reach", 
-    Default = false, 
-    Callback = function(v) 
-        if v then enableReach3() else disableReach3() end 
-    end 
-})
+TabXeno:CreateToggle("Enable / Disable Reach", false, function(v) 
+    if v then enableReach3() else disableReach3() end 
+end)
 
-TabXeno:Slider({ 
-    Title = "Reach Size", 
-    Min = 1, Max = 25, Default = 16, 
-    Callback = function(v) 
-        reachDistance3 = v 
-    end 
-})
+TabXeno:CreateSlider("Reach Size", 1, 25, 16, function(v) 
+    reachDistance3 = v 
+end)
 
-TabXeno:Button({ 
-    Title = "Fake Legs", 
-    Callback = function()
-        local character = lp.Character or lp.CharacterAdded:Wait()
-        local humanoid = character:WaitForChild("Humanoid")
-        if humanoid.RigType == Enum.HumanoidRigType.R6 then
-            character["Right Leg"].Transparency = 1; character["Left Leg"].Transparency = 1; character["Left Leg"].Massless = true
-            local LeftLegM = Instance.new("Part", character); LeftLegM.Name = "Left Leg"; LeftLegM.CanCollide = false; LeftLegM.Color = character["Left Leg"].Color
-            LeftLegM.Size = Vector3.new(1, 2, 1); LeftLegM.Locked = true; LeftLegM.Position = character["Left Leg"].Position
-            local LeftMotor = Instance.new("Motor6D", character.Torso)
-            LeftMotor.Name = "Fake Left Hip"; LeftMotor.C0 = CFrame.new(-1, -1, 0, 0, 0, -1, 0, 1, 0, 1, 0, 0); LeftMotor.C1 = CFrame.new(-0.5, 1, 0, 0, 0, -1, 0, 1, 0, 1, 0, 0)
-            LeftMotor.Part0 = character.Torso; LeftMotor.Part1 = LeftLegM
+TabXeno:CreateButton("Fake Legs", function()
+    local character = lp.Character or lp.CharacterAdded:Wait()
+    local humanoid = character:WaitForChild("Humanoid")
+    if humanoid.RigType == Enum.HumanoidRigType.R6 then
+        character["Right Leg"].Transparency = 1; character["Left Leg"].Transparency = 1; character["Left Leg"].Massless = true
+        local LeftLegM = Instance.new("Part", character); LeftLegM.Name = "Left Leg"; LeftLegM.CanCollide = false; LeftLegM.Color = character["Left Leg"].Color
+        LeftLegM.Size = Vector3.new(1, 2, 1); LeftLegM.Locked = true; LeftLegM.Position = character["Left Leg"].Position
+        local LeftMotor = Instance.new("Motor6D", character.Torso)
+        LeftMotor.Name = "Fake Left Hip"; LeftMotor.C0 = CFrame.new(-1, -1, 0, 0, 0, -1, 0, 1, 0, 1, 0, 0); LeftMotor.C1 = CFrame.new(-0.5, 1, 0, 0, 0, -1, 0, 1, 0, 1, 0, 0)
+        LeftMotor.Part0 = character.Torso; LeftMotor.Part1 = LeftLegM
 
-            character["Right Leg"].Massless = true
-            local RightLegM = Instance.new("Part", character); RightLegM.Name = "Right Leg"; RightLegM.CanCollide = false; RightLegM.Color = character["Right Leg"].Color
-            RightLegM.Size = Vector3.new(1, 2, 1); RightLegM.Locked = true; RightLegM.Position = character["Right Leg"].Position
-            local RightMotor = Instance.new("Motor6D", character.Torso)
-            RightMotor.Name = "Fake Right Hip"; RightMotor.C0 = CFrame.new(1, -1, 0, 0, 0, 1, 0, 1, 0, -1, 0, 0); RightMotor.C1 = CFrame.new(0.5, 1, 0, 0, 0, 1, 0, 1, 0, -1, 0, 0)
-            RightMotor.Part0 = character.Torso; RightMotor.Part1 = RightLegM
-        end
-    end 
-})
+        character["Right Leg"].Massless = true
+        local RightLegM = Instance.new("Part", character); RightLegM.Name = "Right Leg"; RightLegM.CanCollide = false; RightLegM.Color = character["Right Leg"].Color
+        RightLegM.Size = Vector3.new(1, 2, 1); RightLegM.Locked = true; RightLegM.Position = character["Right Leg"].Position
+        local RightMotor = Instance.new("Motor6D", character.Torso)
+        RightMotor.Name = "Fake Right Hip"; RightMotor.C0 = CFrame.new(1, -1, 0, 0, 0, 1, 0, 1, 0, -1, 0, 0); RightMotor.C1 = CFrame.new(0.5, 1, 0, 0, 0, 1, 0, 1, 0, -1, 0, 0)
+        RightMotor.Part0 = character.Torso; RightMotor.Part1 = RightLegM
+    end
+end)
 
 --------------------------------------------------------------------------------
 -- TAB 4: REACT
 --------------------------------------------------------------------------------
-TabReact:Section({ Title = "15% = highest delay (safer)" })
+TabReact:CreateSection("15% = highest delay (safer)")
 
 local function applyReact(tt, interp)
     local function strip(k) return k:gsub("^DFInt",""):gsub("^DFFlag",""):gsub("FString",""):gsub("FLog",""):gsub("^FFlag",""):gsub("^DFint",""):gsub("^FInt","") end
@@ -343,57 +585,49 @@ local function applyReact(tt, interp)
     end)
 end
 
-TabReact:Button({ Title = "React 15%", Callback = function() applyReact("13","90") end })
-TabReact:Button({ Title = "React 25%", Callback = function() applyReact("12","85") end })
-TabReact:Button({ Title = "React 50%", Callback = function() applyReact("10","75") end })
-TabReact:Button({ Title = "React 75%", Callback = function() applyReact("8","67") end })
-TabReact:Button({ Title = "React 100%", Callback = function() applyReact("7","60") end })
+TabReact:CreateButton("React 15%", function() applyReact("13","90") end)
+TabReact:CreateButton("React 25%", function() applyReact("12","85") end)
+TabReact:CreateButton("React 50%", function() applyReact("10","75") end)
+TabReact:CreateButton("React 75%", function() applyReact("8","67") end)
+TabReact:CreateButton("React 100%", function() applyReact("7","60") end)
 
 --------------------------------------------------------------------------------
 -- TAB 5: XENO MOSS
 --------------------------------------------------------------------------------
-TabMoss:Section({ Title = "Moss Hitboxes" })
+TabMoss:CreateSection("Moss Hitboxes")
 
 local function createMossBtn(title, bx, by, bz)
-    TabMoss:Button({ 
-        Title = title, 
-        Callback = function()
-            local BOX_Y_OFFSET = 1.5
-            local function isBoxTouching(pCF,pSz,tCF,tSz)
-                local pMin, pMax = pCF.Position-pSz/2, pCF.Position+pSz/2; local tMin, tMax = tCF.Position-tSz/2, tCF.Position+tSz/2
-                return (pMin.X<=tMax.X and pMax.X>=tMin.X) and (pMin.Y<=tMax.Y and pMax.Y>=tMin.Y) and (pMin.Z<=tMax.Z and pMax.Z>=tMin.Z)
+    TabMoss:CreateButton(title, function()
+        local BOX_Y_OFFSET = 1.5
+        local function isBoxTouching(pCF,pSz,tCF,tSz)
+            local pMin, pMax = pCF.Position-pSz/2, pCF.Position+pSz/2; local tMin, tMax = tCF.Position-tSz/2, tCF.Position+tSz/2
+            return (pMin.X<=tMax.X and pMax.X>=tMin.X) and (pMin.Y<=tMax.Y and pMax.Y>=tMin.Y) and (pMin.Z<=tMax.Z and pMax.Z>=tMin.Z)
+        end
+        local headerAnim = Instance.new("Animation"); headerAnim.AnimationId = "rbxassetid://301501585"
+        local currentTrack = nil
+        local function fireKick()
+            local TPS = workspace:FindFirstChild("TPSSystem") and workspace.TPSSystem:FindFirstChild("TPS"); if not TPS then return end
+            local remote = workspace:FindFirstChild("FE") and workspace.FE:FindFirstChild("System") and workspace.FE.System:FindFirstChild("Header"); if not remote then return end
+            remote:FireServer(lp.UserId,TPS,"Rock'n'roll Star","NeverFearTruth","power=95/100")
+        end
+        local mossWasInside, mossCooldown = false, false
+        RunService.Heartbeat:Connect(function()
+            local char = lp.Character; if not char then return end
+            local head, hrp = char:FindFirstChild("Head"), char:FindFirstChild("HumanoidRootPart"); if not head or not hrp then return end
+            local raisedCFrame, boxSize = head.CFrame*CFrame.new(0,BOX_Y_OFFSET,0), Vector3.new(bx,by,bz)
+            local targets = {}
+            if workspace:FindFirstChild("Balls") then for _,b in workspace.Balls:GetChildren() do if b:IsA("BasePart") then table.insert(targets,b) end end end
+            if workspace:FindFirstChild("TPSSystem") then for _,t in workspace.TPSSystem:GetChildren() do if t:IsA("BasePart") or t.Name=="TPS" then table.insert(targets,t) end end end
+            local ballInside = false
+            for _,t in targets do if t.Position.Y >= hrp.Position.Y+1 and isBoxTouching(raisedCFrame,boxSize,CFrame.new(t.Position+t.Velocity*0.001)*t.CFrame.Rotation,t.Size) then ballInside=true; break end end
+            if ballInside and not mossWasInside and not mossCooldown then
+                mossCooldown=true; pcall(function() currentTrack=char:FindFirstChildOfClass("Humanoid"):LoadAnimation(headerAnim); currentTrack:Play() end); fireKick(); task.delay(0.3,function() mossCooldown=false end)
             end
-            local headerAnim = Instance.new("Animation"); headerAnim.AnimationId = "rbxassetid://301501585"
-            local currentTrack = nil
-            local function fireKick()
-                local TPS = workspace:FindFirstChild("TPSSystem") and workspace.TPSSystem:FindFirstChild("TPS"); if not TPS then return end
-                local remote = workspace:FindFirstChild("FE") and workspace.FE:FindFirstChild("System") and workspace.FE.System:FindFirstChild("Header"); if not remote then return end
-                remote:FireServer(lp.UserId,TPS,"Rock'n'roll Star","NeverFearTruth","power=95/100")
-            end
-            local mossWasInside, mossCooldown = false, false
-            RunService.Heartbeat:Connect(function()
-                local char = lp.Character; if not char then return end
-                local head, hrp = char:FindFirstChild("Head"), char:FindFirstChild("HumanoidRootPart"); if not head or not hrp then return end
-                local raisedCFrame, boxSize = head.CFrame*CFrame.new(0,BOX_Y_OFFSET,0), Vector3.new(bx,by,bz)
-                local targets = {}
-                if workspace:FindFirstChild("Balls") then for _,b in workspace.Balls:GetChildren() do if b:IsA("BasePart") then table.insert(targets,b) end end end
-                if workspace:FindFirstChild("TPSSystem") then for _,t in workspace.TPSSystem:GetChildren() do if t:IsA("BasePart") or t.Name=="TPS" then table.insert(targets,t) end end end
-                local ballInside = false
-                for _,t in targets do if t.Position.Y >= hrp.Position.Y+1 and isBoxTouching(raisedCFrame,boxSize,CFrame.new(t.Position+t.Velocity*0.001)*t.CFrame.Rotation,t.Size) then ballInside=true; break end end
-                if ballInside and not mossWasInside and not mossCooldown then
-                    mossCooldown=true; pcall(function() currentTrack=char:FindFirstChildOfClass("Humanoid"):LoadAnimation(headerAnim); currentTrack:Play() end); fireKick(); task.delay(0.3,function() mossCooldown=false end)
-                end
-                mossWasInside=ballInside
-            end)
-        end 
-    })
+            mossWasInside=ballInside
+        end)
+    end)
 end
 
 createMossBtn("Xeno Moss 15%", 2, 2.8, 3)
 createMossBtn("Xeno Moss 50%", 3, 3.8, 3.6)
 createMossBtn("Xeno Moss 100%", 4, 5, 4.5)
-
---------------------------------------------------------------------------------
--- SELECT HOME TAB ON LOAD
---------------------------------------------------------------------------------
-Window:SelectTab(1)
